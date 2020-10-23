@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	pb "github.com/scayle/proto/user_service"
+	pb "github.com/scayle/proto/go/user_service"
 
 	"golang.org/x/crypto/bcrypt"
 )

@@ -6,7 +6,7 @@ import (
 	"net"
 	"os"
 
-	pb "github.com/scayle/proto/user_service"
+	pb "github.com/scayle/proto/go/user_service"
 
 	"github.com/scayle/common-go"
 
