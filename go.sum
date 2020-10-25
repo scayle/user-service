@@ -113,10 +113,8 @@ github.com/posener/complete v1.1.1/go.mod h1:em0nMJCgc9GFtwrmVmEMR/ZL6WyhyjMBndr
 github.com/posener/complete v1.2.3/go.mod h1:WZIdtGGp+qx0sLrYKtIRAruyNpv6hFCicSgv7Sy7s/s=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/ryanuber/columnize v0.0.0-20160712163229-9b3edd62028f/go.mod h1:sm1tb6uqfes/u+d4ooFouqFdy9/2g9QGwK3SQygK0Ts=
-github.com/scayle/common-go v0.0.0-20201021215419-a5307e87f16c h1:GkQyIFYXNA4JYlxbtpWeJVnKxsiSySiaxN3v4XavjJQ=
-github.com/scayle/common-go v0.0.0-20201021215419-a5307e87f16c/go.mod h1:2+hWA76YEMKWM/eoSxPLo7uGBGBGtGVasSTLoWl94JY=
-github.com/scayle/proto v0.0.0-20201021213612-e128e9e7ff2e h1:3dBDo+ScH35vw/LRnc1+VEQCVrBNERCDfXVwMSz+7B8=
-github.com/scayle/proto v0.0.0-20201021213612-e128e9e7ff2e/go.mod h1:3DNqo0jUpcmlJoadPi/io1DHyBp4MGWDan3pRuh2g2I=
+github.com/scayle/common-go v0.1.0 h1:RLlrWk/pxRIXavJqbCnrFThs8x5iWJohYxeiP/N2/M4=
+github.com/scayle/common-go v0.1.0/go.mod h1:2+hWA76YEMKWM/eoSxPLo7uGBGBGtGVasSTLoWl94JY=
 github.com/scayle/proto/go v0.0.0-20201023191203-ba00f765440a h1:TvLbmnzcWl8LXDtkBrf65ZKoRxIZ3WpgMkvKmcj37g4=
 github.com/scayle/proto/go v0.0.0-20201023191203-ba00f765440a/go.mod h1:rcXqVXkzKA3tk7R2ei2K0OH/UzoT6w5DF5wTwRaPm1w=
 github.com/sean-/seed v0.0.0-20170313163322-e2103e2c3529 h1:nn5Wsu0esKSJiIVhscUtVbo7ada43DJhG55ua/hjS5I=
