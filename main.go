@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strconv"
 
 	pb "github.com/scayle/proto/go/user_service"
 
@@ -35,9 +36,12 @@ func secret() string {
 }
 
 func runGrpc() {
-	common.RegisterServiceWithConsul("user-service")
+	registration := common.RegisterConsulService(
+		"user-service",
+		common.WithDefaultPort(8100),
+		common.WithHTTPHealthCheck(8101))
 
-	listener, err := net.Listen("tcp", common.Port())
+	listener, err := net.Listen("tcp", ":"+strconv.Itoa(registration.Port))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
