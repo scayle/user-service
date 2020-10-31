@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  user-service_debug:
+    image: aligator/godebug:latest
+    ports:
+      - 40000:40000
+    networks:
+      - scayle_scayle
+    volumes:
+      - .:/build
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    command: "--jwt-secret=MySuperSecret"
+    environment:
+      - CONSUL_HOST=consul-service:8500
+
+networks:
+  scayle_scayle:
+    external: true
