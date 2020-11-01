@@ -21,7 +21,6 @@ type repository interface {
 	Create(ctx context.Context, isAdmin bool, username string, email string, password string) (string, error)
 	Get(ctx context.Context, id string) (user, error)
 	GetByName(ctx context.Context, username string) (user, error)
-	Count(Ctx context.Context) int
 	Close()
 }
 
@@ -41,7 +40,12 @@ func (h handler) Create(ctx context.Context, request *pb.CreateUserRequest) (*pb
 		return nil, fmt.Errorf("no permissions to create a new user")
 	}
 
-	id, err := h.repo.Create(ctx, request.GetIsAdmin(), request.GetUsername(), request.GetEmail(), request.GetPassword())
+	hash, err := hash(request.GetPassword())
+	if err != nil {
+		return nil, fmt.Errorf("could not hash the password %w", err)
+	}
+
+	id, err := h.repo.Create(ctx, request.GetIsAdmin(), request.GetUsername(), request.GetEmail(), hash)
 	if err != nil {
 		return nil, fmt.Errorf("could not create user %w", err)
 	}

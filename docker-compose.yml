@@ -1,0 +1,24 @@
+version: '3'
+
+services:
+  godebug_example:
+    image: aligator/godebug:latest
+    ports:
+      - 40000:40000
+    volumes:
+      - .:/build
+
+    # Needed for debugging in Docker.
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      - JWT_SECRET=REPLACEthisSecret
+      - CONSUL_HOST=consul-service:8500
+    networks:
+      - scayle_scayle
+
+networks:
+  scayle_scayle:
+    external: true

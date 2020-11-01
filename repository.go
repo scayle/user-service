@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"strconv"
@@ -10,18 +11,19 @@ import (
 	"github.com/google/uuid"
 	"github.com/scayle/common-go"
 	"github.com/scayle/user-service/mongotypes"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var ErrUserNotFound = errors.New("user not found")
+var ErrCouldNotDecode = errors.New("could not decode document")
 
 type MongoUser struct {
 	Id           primitive.Binary `bson:"_id"`
 	IsAdmin      bool             `bson:"is_admin"`
-	Username     string           `bson:"is_username"`
+	Username     string           `bson:"username"`
 	PasswordHash string           `bson:"password_hash"`
 	Email        string           `bson:"email,omitempty"`
 }
@@ -47,17 +49,21 @@ func NewMongoRepository(ctx context.Context) *mongoRepository {
 	r.client = client
 
 	// create one admin if it doesn't exist yet
-	//	_, err = r.GetByName(ctx, "admin")
-	//	if err != nil && errors.Is(err, ErrUserNotFound) {
-	// ToDo: we have to make sure the admin gets never deleted...
-	//       else it would be a security risk to re-create the admin with the fixed password.
-	_, err = r.Create(ctx, true, "admin", "admin@no-mail.com", "admin")
-	if err != nil {
-		log.Fatalf("could not create first user %v", err)
+	_, err = r.GetByName(ctx, "admin")
+	if err != nil && errors.Is(err, ErrUserNotFound) {
+		// ToDo: we have to make sure the admin gets never deleted...
+		//       else it would be a security risk to re-create the admin with the fixed password.
+		hash, err := hash("admin")
+		if err != nil {
+			log.Fatal(err)
+		}
+		_, err = r.Create(ctx, true, "admin", "admin@no-mail.com", hash)
+		if err != nil {
+			log.Fatalf("could not create first user %v", err)
+		}
+	} else if err != nil {
+		log.Fatalf("could not load the admin %v", err)
 	}
-	//	} else if err != nil {
-	//		log.Fatalf("could not load the admin %v", err)
-	//  }
 
 	return &r
 }
@@ -66,13 +72,8 @@ func (r *mongoRepository) users() *mongo.Collection {
 	return r.client.Database("user-service").Collection("users")
 }
 
-func (r *mongoRepository) Create(ctx context.Context, isAdmin bool, username string, email string, password string) (string, error) {
+func (r *mongoRepository) Create(ctx context.Context, isAdmin bool, username string, email string, passwordHash string) (string, error) {
 	users := r.users()
-
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
-	if err != nil {
-		return "", err
-	}
 
 	id, err := uuid.NewRandom()
 	if err != nil {
@@ -83,7 +84,7 @@ func (r *mongoRepository) Create(ctx context.Context, isAdmin bool, username str
 		Id:           mongotypes.MustFromUUID(id),
 		IsAdmin:      isAdmin,
 		Username:     username,
-		PasswordHash: string(hash),
+		PasswordHash: passwordHash,
 		Email:        email,
 	})
 	if err != nil {
@@ -93,20 +94,52 @@ func (r *mongoRepository) Create(ctx context.Context, isAdmin bool, username str
 	return id.String(), nil
 }
 
+func (r *mongoRepository) queryUser(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) (user, error) {
+	users := r.users()
+
+	res := users.FindOne(ctx, filter, opts...)
+	if res.Err() != nil && errors.Is(mongo.ErrNoDocuments, res.Err()) {
+		return user{}, fmt.Errorf("%w:\n", ErrUserNotFound)
+	} else if res.Err() != nil {
+		return user{}, fmt.Errorf("error while searching for user:\n%w", res.Err())
+	}
+
+	foundUser := new(MongoUser)
+	err := res.Decode(foundUser)
+	if err != nil {
+		return user{}, fmt.Errorf("%w:\n", ErrCouldNotDecode)
+	}
+
+	id, err := mongotypes.ToUUID(foundUser.Id)
+	if err != nil {
+		return user{}, fmt.Errorf("could not convert to UUID: %v\n%w", foundUser.Id, err)
+	}
+	return user{
+		id:           id.String(),
+		isAdmin:      foundUser.IsAdmin,
+		username:     foundUser.Username,
+		email:        foundUser.Email,
+		passwordHash: foundUser.PasswordHash,
+	}, nil
+}
+
 func (r *mongoRepository) Get(ctx context.Context, id string) (user, error) {
-	panic("implement me")
+	parsedUUID, err := uuid.Parse(id)
+	if err != nil {
+		return user{}, fmt.Errorf("could not parse id %v:\n%w", id, err)
+	}
+	return r.queryUser(ctx, bson.D{{"_id", mongotypes.MustFromUUID(parsedUUID)}})
 }
 
 func (r *mongoRepository) GetByName(ctx context.Context, username string) (user, error) {
-	panic("implement me")
-}
-
-func (r *mongoRepository) Count(ctx context.Context) int {
-	panic("implement me")
+	return r.queryUser(ctx, bson.D{{"username", username}})
 }
 
 func (r *mongoRepository) Close() {
 	if r.client != nil {
-		r.client.Disconnect(context.Background())
+		err := r.client.Disconnect(context.Background())
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 }
