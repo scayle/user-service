@@ -9,11 +9,20 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type user struct {
+	id           string
+	isAdmin      bool
+	username     string
+	email        string
+	passwordHash string
+}
+
 type repository interface {
 	Create(ctx context.Context, isAdmin bool, username string, email string, password string) (string, error)
 	Get(ctx context.Context, id string) (user, error)
 	GetByName(ctx context.Context, username string) (user, error)
-	Count(_ context.Context) int
+	Count(Ctx context.Context) int
+	Close()
 }
 
 type authenticator interface {

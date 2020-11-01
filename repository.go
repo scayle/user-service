@@ -4,81 +4,109 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net"
+	"strconv"
 
 	"github.com/google/uuid"
+	"github.com/scayle/common-go"
+	"github.com/scayle/user-service/mongotypes"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type user struct {
-	id           string
-	isAdmin      bool
-	username     string
-	email        string
-	passwordHash string
+var ErrUserNotFound = errors.New("user not found")
+
+type MongoUser struct {
+	Id           primitive.Binary `bson:"_id"`
+	IsAdmin      bool             `bson:"is_admin"`
+	Username     string           `bson:"is_username"`
+	PasswordHash string           `bson:"password_hash"`
+	Email        string           `bson:"email,omitempty"`
 }
 
-type inMemoryRepository struct {
-	users       map[string]*user
-	usersByName map[string]*user
+type mongoRepository struct {
+	client *mongo.Client
 }
 
-func (r *inMemoryRepository) init(ctx context.Context) {
-	if r.users != nil {
-		return
-	}
+func NewMongoRepository(ctx context.Context) *mongoRepository {
+	r := mongoRepository{}
 
-	r.users = make(map[string]*user)
-	r.usersByName = make(map[string]*user)
-
-	// create one admin
-	_, err := r.Create(ctx, true, "admin", "admin@no-mail.com", "admin")
+	mongodbEntry := common.GetRandomServiceWithConsul("mongodb")
+	uri := "mongodb://" + net.JoinHostPort(mongodbEntry.Service.Address, strconv.Itoa(mongodbEntry.Service.Port))
+	client, err := mongo.NewClient(options.Client().ApplyURI(uri))
 	if err != nil {
-		log.Fatalf("could not create first user", err)
+		log.Fatal(err)
 	}
+	err = client.Connect(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	r.client = client
+
+	// create one admin if it doesn't exist yet
+	//	_, err = r.GetByName(ctx, "admin")
+	//	if err != nil && errors.Is(err, ErrUserNotFound) {
+	// ToDo: we have to make sure the admin gets never deleted...
+	//       else it would be a security risk to re-create the admin with the fixed password.
+	_, err = r.Create(ctx, true, "admin", "admin@no-mail.com", "admin")
+	if err != nil {
+		log.Fatalf("could not create first user %v", err)
+	}
+	//	} else if err != nil {
+	//		log.Fatalf("could not load the admin %v", err)
+	//  }
+
+	return &r
 }
 
-func (r *inMemoryRepository) Count(_ context.Context) int {
-	return len(r.users)
+func (r *mongoRepository) users() *mongo.Collection {
+	return r.client.Database("user-service").Collection("users")
 }
 
-func (r *inMemoryRepository) Create(ctx context.Context, isAdmin bool, username string, email string, password string) (string, error) {
-	r.init(ctx)
+func (r *mongoRepository) Create(ctx context.Context, isAdmin bool, username string, email string, password string) (string, error) {
+	users := r.users()
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 	if err != nil {
 		return "", err
 	}
 
-	u := user{
-		id:           uuid.New().String(),
-		isAdmin:      isAdmin,
-		username:     username,
-		email:        email,
-		passwordHash: string(hash),
+	id, err := uuid.NewRandom()
+	if err != nil {
+		return "", err
 	}
 
-	r.users[u.id] = &u
-	r.usersByName[u.username] = &u
+	_, err = users.InsertOne(ctx, MongoUser{
+		Id:           mongotypes.MustFromUUID(id),
+		IsAdmin:      isAdmin,
+		Username:     username,
+		PasswordHash: string(hash),
+		Email:        email,
+	})
+	if err != nil {
+		return "", err
+	}
 
-	return u.id, nil
+	return id.String(), nil
 }
 
-func (r *inMemoryRepository) Get(ctx context.Context, id string) (user, error) {
-	r.init(ctx)
-
-	if u, ok := r.users[id]; ok {
-		return *u, nil
-	}
-
-	return user{}, errors.New("user not found")
+func (r *mongoRepository) Get(ctx context.Context, id string) (user, error) {
+	panic("implement me")
 }
 
-func (r *inMemoryRepository) GetByName(ctx context.Context, username string) (user, error) {
-	r.init(ctx)
+func (r *mongoRepository) GetByName(ctx context.Context, username string) (user, error) {
+	panic("implement me")
+}
 
-	if u, ok := r.usersByName[username]; ok {
-		return *u, nil
+func (r *mongoRepository) Count(ctx context.Context) int {
+	panic("implement me")
+}
+
+func (r *mongoRepository) Close() {
+	if r.client != nil {
+		r.client.Disconnect(context.Background())
 	}
-
-	return user{}, errors.New("user not found")
 }
