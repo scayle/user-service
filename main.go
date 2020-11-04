@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"net"
 	"os"
 	"strconv"
+	"time"
 
 	pb "github.com/scayle/proto/go/user_service"
 
@@ -46,11 +48,18 @@ func runGrpc() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	srv := grpc.NewServer()
-	pb.RegisterUserServiceServer(srv, &handler{
-		repo: &inMemoryRepository{},
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 10*time.Second)
+	h := &handler{
+		repo: NewMongoRepository(ctx),
 		auth: &jwtAuthenticator{[]byte(secret())},
-	})
+	}
+	defer func() {
+		cancelFunc()
+		h.repo.Close()
+	}()
+
+	srv := grpc.NewServer()
+	pb.RegisterUserServiceServer(srv, h)
 
 	log.Println("setup finished - starting service")
 	if e := srv.Serve(listener); e != nil {

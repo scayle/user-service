@@ -1,0 +1,15 @@
+version: '3'
+
+services:
+  user-service:
+    hostname: user-service
+    build: .
+    environment:
+      - JWT_SECRET=REPLACEthisSecret
+      - CONSUL_HOST=consul-service:8500
+    networks:
+      - scayle_scayle
+
+networks:
+  scayle_scayle:
+    external: true
