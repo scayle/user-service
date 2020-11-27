@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	pb "github.com/scayle/proto/go/user_service"
+	pb "github.com/scayle/proto-go/user_service"
 
 	"github.com/scayle/common-go"
 
