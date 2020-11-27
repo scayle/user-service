@@ -166,7 +166,9 @@ func (r *mongoRepository) queryUsers(ctx context.Context, filter interface{}, op
 
 	foundUsers := make([]user, 0)
 
-	for ; res.RemainingBatchLength() > 0; res.Next(ctx) {
+	for res.RemainingBatchLength() > 0 {
+		res.Next(ctx)
+
 		decodedUser, err := r.decodeUser(res)
 		if err != nil {
 			return []user{}, nil

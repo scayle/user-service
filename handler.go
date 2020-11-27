@@ -131,12 +131,12 @@ func (h handler) GetAll(ctx context.Context, request *pb.GetAllUserRequest) (*pb
 	}
 
 	res := &pb.GetAllUserResponse{}
-
 	for _, user := range users {
 		res.Users = append(res.Users, &pb.GetUserResponse{
 			Id:       user.id,
 			Email:    user.email,
 			Username: user.username,
+			IsAdmin:  user.isAdmin,
 		})
 	}
 	return res, nil
