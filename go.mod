@@ -16,7 +16,7 @@ require (
 	github.com/klauspost/compress v1.11.3 // indirect
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/scayle/common-go v0.2.0
-	github.com/scayle/proto-go v0.3.2
+	github.com/scayle/proto-go v0.3.3
 	go.mongodb.org/mongo-driver v1.4.3
 	golang.org/x/crypto v0.0.0-20201117144127-c1f2f97bffc9
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9 // indirect

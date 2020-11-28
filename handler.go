@@ -79,10 +79,10 @@ func (h handler) Update(ctx context.Context, request *pb.UpdateUserRequest) (*pb
 	}
 
 	var passwordHash *string
-	if request.GetPassword() != "" {
+	if request.Password != nil {
 		var err error
 		newHash := ""
-		newHash, err = hash(request.GetPassword())
+		newHash, err = hash(request.Password.Value)
 		if err != nil {
 			return nil, fmt.Errorf("could not hash the password %w", err)
 		}
@@ -90,7 +90,22 @@ func (h handler) Update(ctx context.Context, request *pb.UpdateUserRequest) (*pb
 		passwordHash = &newHash
 	}
 
-	user, err := h.repo.Update(ctx, request.GetId(), request.IsAdmin, request.Username, request.Email, passwordHash)
+	var isAdmin *bool
+	if request.IsAdmin != nil {
+		isAdmin = &request.IsAdmin.Value
+	}
+
+	var username *string
+	if request.Username != nil {
+		username = &request.Username.Value
+	}
+
+	var email *string
+	if request.Email != nil {
+		email = &request.Email.Value
+	}
+
+	user, err := h.repo.Update(ctx, request.GetId(), isAdmin, username, email, passwordHash)
 	if err != nil {
 		return nil, fmt.Errorf("could not create user %w", err)
 	}
