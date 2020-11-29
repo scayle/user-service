@@ -99,22 +99,27 @@ func (r *mongoRepository) Update(ctx context.Context, id string, isAdmin *bool, 
 
 	updateFields := bson.D{}
 	if isAdmin != nil {
-		updateFields.Map()["is_admin"] = *isAdmin
+		updateFields = append(updateFields, primitive.E{Key: "is_admin", Value: *isAdmin})
 	}
 
 	if username != nil {
-		updateFields.Map()["username"] = *username
+		updateFields = append(updateFields, primitive.E{Key: "username", Value: *username})
 	}
 
 	if email != nil {
-		updateFields.Map()["email"] = *email
+		updateFields = append(updateFields, primitive.E{Key: "email", Value: *email})
 	}
 
 	if passwordHash != nil {
-		updateFields.Map()["password_hash"] = *passwordHash
+		updateFields = append(updateFields, primitive.E{Key: "password_hash", Value: *passwordHash})
 	}
 
-	_, err := users.UpdateOne(ctx, bson.D{{"id", id}}, updateFields)
+	parsedId, err := mongotypes.FromUUIDString(id)
+	if err != nil {
+		return user{}, fmt.Errorf("could not convert id to an uuid in update:\n%w", err)
+	}
+
+	_, err = users.UpdateOne(ctx, bson.D{{"_id", parsedId}}, bson.D{{"$set", updateFields}})
 	if err != nil {
 		return user{}, err
 	}

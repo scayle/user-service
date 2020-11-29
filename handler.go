@@ -69,12 +69,12 @@ func (h handler) Update(ctx context.Context, request *pb.UpdateUserRequest) (*pb
 	}
 
 	// Only admins or the user itself can update.
-	if !claims.IsAdmin || claims.UserId != request.Id {
+	if !claims.IsAdmin && claims.UserId != request.Id {
 		return nil, fmt.Errorf("update a user:\n%w", ErrNoPermission)
 	}
 
 	// Only admins can change the IsAdmin flag.
-	if !claims.IsAdmin && request.IsAdmin != nil {
+	if request.IsAdmin != nil && !claims.IsAdmin {
 		return nil, fmt.Errorf("update a user:\n%w", ErrNoPermission)
 	}
 
