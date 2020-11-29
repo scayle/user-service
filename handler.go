@@ -43,7 +43,13 @@ type handler struct {
 }
 
 func (h handler) Create(ctx context.Context, request *pb.CreateUserRequest) (*pb.CreateUserResponse, error) {
-	if request.GetClaims() == nil {
+	claims := request.GetClaims()
+	if claims == nil {
+		return nil, fmt.Errorf("creating a new user:\n%w", ErrNoPermission)
+	}
+
+	// Only admins can create new users.
+	if !claims.IsAdmin {
 		return nil, fmt.Errorf("creating a new user:\n%w", ErrNoPermission)
 	}
 
