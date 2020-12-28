@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
-	pb "github.com/scayle/proto/go/user_service"
+	pb "github.com/scayle/proto-go/user_service"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -17,9 +18,15 @@ type user struct {
 	passwordHash string
 }
 
+var (
+	ErrNoPermission = errors.New("no permissions")
+)
+
 type repository interface {
 	Create(ctx context.Context, isAdmin bool, username string, email string, password string) (string, error)
+	Update(ctx context.Context, id string, isAdmin *bool, username *string, email *string, passwordHash *string) (user, error)
 	Get(ctx context.Context, id string) (user, error)
+	GetAll(ctx context.Context) ([]user, error)
 	GetByName(ctx context.Context, username string) (user, error)
 	Close()
 }
@@ -36,8 +43,14 @@ type handler struct {
 }
 
 func (h handler) Create(ctx context.Context, request *pb.CreateUserRequest) (*pb.CreateUserResponse, error) {
-	if request.GetClaims() == nil {
-		return nil, fmt.Errorf("no permissions to create a new user")
+	claims := request.GetClaims()
+	if claims == nil {
+		return nil, fmt.Errorf("creating a new user:\n%w", ErrNoPermission)
+	}
+
+	// Only admins can create new users.
+	if !claims.IsAdmin {
+		return nil, fmt.Errorf("creating a new user:\n%w", ErrNoPermission)
 	}
 
 	hash, err := hash(request.GetPassword())
@@ -55,7 +68,67 @@ func (h handler) Create(ctx context.Context, request *pb.CreateUserRequest) (*pb
 	}, nil
 }
 
+func (h handler) Update(ctx context.Context, request *pb.UpdateUserRequest) (*pb.UpdateUserResponse, error) {
+	claims := request.GetClaims()
+	if claims == nil {
+		return nil, fmt.Errorf("update a user:\n%w", ErrNoPermission)
+	}
+
+	// Only admins or the user itself can update.
+	if !claims.IsAdmin && claims.UserId != request.Id {
+		return nil, fmt.Errorf("update a user:\n%w", ErrNoPermission)
+	}
+
+	// Only admins can change the IsAdmin flag.
+	if request.IsAdmin != nil && !claims.IsAdmin {
+		return nil, fmt.Errorf("update a user:\n%w", ErrNoPermission)
+	}
+
+	var passwordHash *string
+	if request.Password != nil {
+		var err error
+		newHash := ""
+		newHash, err = hash(request.Password.Value)
+		if err != nil {
+			return nil, fmt.Errorf("could not hash the password %w", err)
+		}
+
+		passwordHash = &newHash
+	}
+
+	var isAdmin *bool
+	if request.IsAdmin != nil {
+		isAdmin = &request.IsAdmin.Value
+	}
+
+	var username *string
+	if request.Username != nil {
+		username = &request.Username.Value
+	}
+
+	var email *string
+	if request.Email != nil {
+		email = &request.Email.Value
+	}
+
+	user, err := h.repo.Update(ctx, request.GetId(), isAdmin, username, email, passwordHash)
+	if err != nil {
+		return nil, fmt.Errorf("could not create user %w", err)
+	}
+
+	return &pb.UpdateUserResponse{
+		Id:       user.id,
+		IsAdmin:  user.isAdmin,
+		Username: user.username,
+		Email:    user.email,
+	}, nil
+}
+
 func (h handler) Get(ctx context.Context, request *pb.GetUserRequest) (*pb.GetUserResponse, error) {
+	if request.GetClaims() == nil {
+		return nil, fmt.Errorf("getting a user:\n%w", ErrNoPermission)
+	}
+
 	user, err := h.repo.Get(ctx, request.GetId())
 	if err != nil {
 		return nil, fmt.Errorf("could not get user %w", err)
@@ -64,7 +137,30 @@ func (h handler) Get(ctx context.Context, request *pb.GetUserRequest) (*pb.GetUs
 		Id:       user.id,
 		Email:    user.email,
 		Username: user.username,
+		IsAdmin:  user.isAdmin,
 	}, nil
+}
+
+func (h handler) GetAll(ctx context.Context, request *pb.GetAllUserRequest) (*pb.GetAllUserResponse, error) {
+	if request.GetClaims() == nil {
+		return nil, fmt.Errorf("getting all users:\n%w", ErrNoPermission)
+	}
+
+	users, err := h.repo.GetAll(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not get user %w", err)
+	}
+
+	res := &pb.GetAllUserResponse{}
+	for _, user := range users {
+		res.Users = append(res.Users, &pb.GetUserResponse{
+			Id:       user.id,
+			Email:    user.email,
+			Username: user.username,
+			IsAdmin:  user.isAdmin,
+		})
+	}
+	return res, nil
 }
 
 func (h handler) Auth(ctx context.Context, request *pb.AuthRequest) (*pb.AuthResponse, error) {

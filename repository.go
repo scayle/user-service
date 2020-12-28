@@ -94,16 +94,40 @@ func (r *mongoRepository) Create(ctx context.Context, isAdmin bool, username str
 	return id.String(), nil
 }
 
-func (r *mongoRepository) queryUser(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) (user, error) {
+func (r *mongoRepository) Update(ctx context.Context, id string, isAdmin *bool, username *string, email *string, passwordHash *string) (user, error) {
 	users := r.users()
 
-	res := users.FindOne(ctx, filter, opts...)
-	if res.Err() != nil && errors.Is(mongo.ErrNoDocuments, res.Err()) {
-		return user{}, fmt.Errorf("%w:\n", ErrUserNotFound)
-	} else if res.Err() != nil {
-		return user{}, fmt.Errorf("error while searching for user:\n%w", res.Err())
+	updateFields := bson.D{}
+	if isAdmin != nil {
+		updateFields = append(updateFields, primitive.E{Key: "is_admin", Value: *isAdmin})
 	}
 
+	if username != nil {
+		updateFields = append(updateFields, primitive.E{Key: "username", Value: *username})
+	}
+
+	if email != nil {
+		updateFields = append(updateFields, primitive.E{Key: "email", Value: *email})
+	}
+
+	if passwordHash != nil {
+		updateFields = append(updateFields, primitive.E{Key: "password_hash", Value: *passwordHash})
+	}
+
+	parsedId, err := mongotypes.FromUUIDString(id)
+	if err != nil {
+		return user{}, fmt.Errorf("could not convert id to an uuid in update:\n%w", err)
+	}
+
+	_, err = users.UpdateOne(ctx, bson.D{{"_id", parsedId}}, bson.D{{"$set", updateFields}})
+	if err != nil {
+		return user{}, err
+	}
+
+	return r.Get(ctx, id)
+}
+
+func (r *mongoRepository) decodeUser(res interface{ Decode(interface{}) error }) (user, error) {
 	foundUser := new(MongoUser)
 	err := res.Decode(foundUser)
 	if err != nil {
@@ -114,6 +138,7 @@ func (r *mongoRepository) queryUser(ctx context.Context, filter interface{}, opt
 	if err != nil {
 		return user{}, fmt.Errorf("could not convert to UUID: %v\n%w", foundUser.Id, err)
 	}
+
 	return user{
 		id:           id.String(),
 		isAdmin:      foundUser.IsAdmin,
@@ -121,6 +146,43 @@ func (r *mongoRepository) queryUser(ctx context.Context, filter interface{}, opt
 		email:        foundUser.Email,
 		passwordHash: foundUser.PasswordHash,
 	}, nil
+}
+
+func (r *mongoRepository) queryUser(ctx context.Context, filter interface{}, opts ...*options.FindOneOptions) (user, error) {
+	users := r.users()
+
+	res := users.FindOne(ctx, filter, opts...)
+	if res.Err() != nil && errors.Is(res.Err(), mongo.ErrNoDocuments) {
+		return user{}, fmt.Errorf("%w:\n", ErrUserNotFound)
+	} else if res.Err() != nil {
+		return user{}, fmt.Errorf("error while searching for user:\n%w", res.Err())
+	}
+
+	return r.decodeUser(res)
+}
+
+func (r *mongoRepository) queryUsers(ctx context.Context, filter interface{}, opts ...*options.FindOptions) ([]user, error) {
+	users := r.users()
+
+	res, err := users.Find(ctx, filter, opts...)
+	if err != nil {
+		return []user{}, fmt.Errorf("error while searching for users:\n%w", err)
+	}
+
+	foundUsers := make([]user, 0)
+
+	for res.RemainingBatchLength() > 0 {
+		res.Next(ctx)
+
+		decodedUser, err := r.decodeUser(res)
+		if err != nil {
+			return []user{}, nil
+		}
+
+		foundUsers = append(foundUsers, decodedUser)
+	}
+
+	return foundUsers, nil
 }
 
 func (r *mongoRepository) Get(ctx context.Context, id string) (user, error) {
@@ -133,6 +195,10 @@ func (r *mongoRepository) Get(ctx context.Context, id string) (user, error) {
 
 func (r *mongoRepository) GetByName(ctx context.Context, username string) (user, error) {
 	return r.queryUser(ctx, bson.D{{"username", username}})
+}
+
+func (r *mongoRepository) GetAll(ctx context.Context) ([]user, error) {
+	return r.queryUsers(ctx, bson.D{})
 }
 
 func (r *mongoRepository) Close() {

@@ -4,7 +4,7 @@ services:
   godebug_example:
     image: aligator/godebug:latest
     ports:
-      - 40000:40000
+      - 40001:40000
     volumes:
       - .:/build
 
