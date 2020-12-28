@@ -152,7 +152,7 @@ func (r *mongoRepository) queryUser(ctx context.Context, filter interface{}, opt
 	users := r.users()
 
 	res := users.FindOne(ctx, filter, opts...)
-	if res.Err() != nil && errors.Is(mongo.ErrNoDocuments, res.Err()) {
+	if res.Err() != nil && errors.Is(res.Err(), mongo.ErrNoDocuments) {
 		return user{}, fmt.Errorf("%w:\n", ErrUserNotFound)
 	} else if res.Err() != nil {
 		return user{}, fmt.Errorf("error while searching for user:\n%w", res.Err())
